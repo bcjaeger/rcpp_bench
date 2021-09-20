@@ -258,6 +258,9 @@ void cholesky_invert(){
 
 }
 
+// ----------------------------------------------------------------------------
+// ------------------- Newton raphson algo for Cox PH model -------------------
+// ----------------------------------------------------------------------------
 
 // [[Rcpp::export]]
 double newtraph_cph_iter(const arma::uword& method,
@@ -579,7 +582,6 @@ double newtraph_cph_init(const arma::uword& method,
   return(loglik);
 
 }
-
 
 
 // [[Rcpp::export]]

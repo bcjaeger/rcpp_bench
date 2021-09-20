@@ -11,16 +11,20 @@ using namespace Rcpp;
 // ----------------------------------------------------------------------------
 
 // special note: dont change these doubles to uword,
-//               even though some are functions of uwords;
+//               even though some of them could be uwords;
 //               operations involving uwords and doubles are not
-//               straightforward and may break the routine
+//               straightforward and may break the routine.
+// also: double + uword is slower than double + double.
+
 double
   weight_avg,
   weight_events,
   denom_events,
   denom,
   n_events,
+  n_at_risk,
   person_time,
+  w_node_person,
   x_beta,
   risk,
   loglik,
@@ -32,27 +36,22 @@ arma::uword
   j,
   k,
   iter,
-  nrisk,
   person,
-  n_vars,
-  w_node_person;
+  n_vars;
 
-// boolean used to break loops in special cases
-// (i.e., when a delayed break statement is needed)
+// a delayed break statement
 bool break_loop;
 
 // armadillo vectors (doubles)
 arma::vec
   beta_current,
   beta_new,
+  w_node,
   u,
   a,
   a2,
   XB,
   Risk;
-
-// armadillo unsigned integer vectors
-arma::uvec w_node;
 
 // armadillo matrices (doubles)
 arma::mat
@@ -61,8 +60,6 @@ arma::mat
   imat,
   cmat,
   cmat2;
-
-
 
 // [[Rcpp::export]]
 arma::mat x_scale_wtd(){
@@ -74,7 +71,8 @@ arma::mat x_scale_wtd(){
   arma::mat out(n_vars, 2);
   arma::vec means = out.unsafe_col(0);   // Reference to column 1
   arma::vec scales = out.unsafe_col(1);  // Reference to column 2
-  arma::uword w_node_sum = arma::sum(w_node);
+
+  double w_node_sum = arma::sum(w_node);
 
   for(i = 0; i < n_vars; i++) {
 
@@ -175,7 +173,7 @@ void cholesky_solve(){
   // A hack so that i is never < 0 (out of index for uwords)
   arma::uword ii;
 
-  for (i = (n_vars); i >= 1; i--){
+  for (i = n_vars; i >= 1; i--){
 
     ii = i-1;
 
@@ -259,7 +257,7 @@ void cholesky_invert(){
 }
 
 // ----------------------------------------------------------------------------
-// ------------------- Newton raphson algo for Cox PH model -------------------
+// ------------------- Newton Raphson algo for Cox PH model -------------------
 // ----------------------------------------------------------------------------
 
 // [[Rcpp::export]]
@@ -270,7 +268,7 @@ double newtraph_cph_iter(const arma::uword& method,
 
   loglik = 0;
 
-  nrisk = 0;
+  n_at_risk = 0;
 
   person = x_node.n_rows - 1;
 
@@ -300,7 +298,7 @@ double newtraph_cph_iter(const arma::uword& method,
     // walk through this set of tied times
     while(y_node.at(person, 0) == person_time){
 
-      nrisk++;
+      n_at_risk++;
 
       x_beta = XB.at(person);
       risk = Risk.at(person);
@@ -436,7 +434,7 @@ double newtraph_cph_init(const arma::uword& method,
 
   denom = 0;
   loglik = 0;
-  nrisk = 0;
+  n_at_risk = 0;
 
   person = x_node.n_rows - 1;
 
@@ -464,7 +462,7 @@ double newtraph_cph_init(const arma::uword& method,
     // walk through this set of tied times
     while(y_node.at(person, 0) == person_time){
 
-      nrisk++;
+      n_at_risk++;
 
       risk = w_node.at(person);
 
@@ -585,18 +583,21 @@ double newtraph_cph_init(const arma::uword& method,
 
 
 // [[Rcpp::export]]
-arma::mat newtraph_cph(const arma::mat& x,
-                       const arma::mat& y,
-                       const arma::uvec& weights,
+arma::mat newtraph_cph(NumericMatrix& x,
+                       NumericMatrix& y,
+                       NumericVector& weights,
                        const arma::uword& method,
                        const double& eps,
                        const arma::uword& iter_max,
                        const bool& rescale){
 
+  x_node = arma::mat(x.begin(), x.nrow(), x.ncol(), false);
+  y_node = arma::mat(y.begin(), y.nrow(), y.ncol(), false);
+  w_node = arma::vec(weights.begin(), weights.size(), false);
 
-  x_node = x;
-  y_node = y;
-  w_node = weights;
+  // x_node = x;
+  // y_node = y;
+  // w_node = weights;
 
   n_vars = x_node.n_cols;
 

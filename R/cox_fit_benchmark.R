@@ -44,8 +44,8 @@ glmnet_args <- list(x = x,
                     weights = weights)
 
 
-orsf <- newtraph_cph(x = x,
-                     y = y,
+orsf <- newtraph_cph(x[, ],
+                     y,
                      weights,
                      method = 0,
                      eps = 1e-5,
@@ -55,15 +55,15 @@ orsf <- newtraph_cph(x = x,
 surv <- do.call(coxph.fit, coxph_args)
 
 # verify that orsf and surv get the same coefficients
-max(abs(orsf[, 1] - surv$coefficients))
+print(max(abs(orsf[, 1] - surv$coefficients)))
 # verify that orsf and surv get the same standard error
-max(abs(orsf[, 2] - sqrt(diag(surv$var))))
+print(max(abs(orsf[, 2] - sqrt(diag(surv$var)))))
 
 
 bmark <- microbenchmark(
 
-    orsf = newtraph_cph(x = x,
-                        y = y,
+    orsf = newtraph_cph(x = x[, ],
+                        y = y[, ],
                         weights,
                         method = 0,
                         eps = 1e-5,

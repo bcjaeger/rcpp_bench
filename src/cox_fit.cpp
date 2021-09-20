@@ -7,12 +7,13 @@
 using namespace Rcpp;
 
 // ----------------------------------------------------------------------------
-// ---------------------------- cholesky functions ----------------------------
+// ---------------------------- global parameters -----------------------------
 // ----------------------------------------------------------------------------
 
-
-// special note: dont change these doubles to uword;
-//               it is likely to break the routine
+// special note: dont change these doubles to uword,
+//               even though some are functions of uwords;
+//               operations involving uwords and doubles are not
+//               straightforward and may break the routine
 double
   weight_avg,
   weight_events,
@@ -25,6 +26,7 @@ double
   loglik,
   temp;
 
+// armadillo unsigned integers
 arma::uword
   i,
   j,
@@ -35,8 +37,11 @@ arma::uword
   n_vars,
   w_node_person;
 
+// boolean used to break loops in special cases
+// (i.e., when a delayed break statement is needed)
 bool break_loop;
 
+// armadillo vectors (doubles)
 arma::vec
   beta_current,
   beta_new,
@@ -46,8 +51,10 @@ arma::vec
   XB,
   Risk;
 
+// armadillo unsigned integer vectors
 arma::uvec w_node;
 
+// armadillo matrices (doubles)
 arma::mat
   x_node,
   y_node,
@@ -93,6 +100,9 @@ arma::mat x_scale_wtd(){
 
 }
 
+// ----------------------------------------------------------------------------
+// ---------------------------- cholesky functions ----------------------------
+// ----------------------------------------------------------------------------
 
 // [[Rcpp::export]]
 void cholesky(){

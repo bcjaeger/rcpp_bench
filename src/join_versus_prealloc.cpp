@@ -1,9 +1,26 @@
 
-#include<RcppArmadillo.h>
+#include <RcppArmadillo.h>
+#include <RcppArmadilloExtensions/sample.h>
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 using namespace arma;
+
+
+// [[Rcpp::export]]
+mat arma_resize(uword n_row, uword n_col){
+
+  mat big(1, n_col);
+
+  for(uword i = 2; i <= n_row; i++){
+
+    big.resize(i, n_col);
+
+  }
+
+  return(big);
+
+}
 
 // [[Rcpp::export]]
 mat arma_join(uword n_row, uword n_col){

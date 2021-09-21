@@ -170,26 +170,22 @@ void cholesky_solve(){
 
   }
 
-  // A hack so that i is never < 0 (out of index for uwords)
-  arma::uword ii;
 
   for (i = n_vars; i >= 1; i--){
 
-    ii = i-1;
+    if (imat.at(i-1, i-1) == 0){
 
-    if (imat.at(ii, ii) == 0){
-
-      u[ii] =0;
+      u[i-1] = 0;
 
     } else {
 
-      temp = u[ii] / imat.at(ii, ii);
+      temp = u[i-1] / imat.at(i-1, i-1);
 
-      for (j = ii+1; j < n_vars; j++){
-        temp -= u[j] * imat.at(j, ii);
+      for (j = i; j < n_vars; j++){
+        temp -= u[j] * imat.at(j, i-1);
       }
 
-      u[ii] = temp;
+      u[i-1] = temp;
 
     }
 
@@ -429,8 +425,7 @@ double newtraph_cph_iter(const arma::uword& method,
 
 
 // [[Rcpp::export]]
-double newtraph_cph_init(const arma::uword& method,
-                         const arma::vec& beta){
+double newtraph_cph_init(const arma::uword& method){
 
   denom = 0;
   loglik = 0;
@@ -625,7 +620,7 @@ arma::mat newtraph_cph(NumericMatrix& x,
   cmat2.set_size(n_vars, n_vars);
 
   // do the initial iteration
-  ll_best = newtraph_cph_init(method, beta_new);
+  ll_best = newtraph_cph_init(method);
 
   //Rcpp::Rcout << "ll_best: " << ll_best << std::endl;
 

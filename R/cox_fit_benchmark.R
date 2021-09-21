@@ -15,16 +15,20 @@ Rcpp::sourceCpp("src/cox_fit.cpp")
 x <- as.matrix(.pbc[, -c(1,2,3,6), drop = FALSE])
 y <- Surv(.pbc$time, .pbc$status)
 
-# x <- orsf2::flchain_x
-# x <- x[, - which(colnames(x)=='sexM')]
-# y <- orsf2::flchain_y
-# y[1:3, 1] <- y[1:3, 1]+1e-4
+x <- orsf2::flchain_x
+x <- x[, - which(colnames(x)=='sexM')]
+y <- orsf2::flchain_y
+y[1:3, 1] <- y[1:3, 1]+1e-4
+
+
+
+# x <- x[,2, drop=F]
 
 set.seed(1)
 
 weights <- sample(1:5, size = nrow(x), replace = TRUE)
 
-iter_max = 10
+iter_max = 3
 
 coxph_args <- list(x = x,
                    y = y,
@@ -44,7 +48,7 @@ glmnet_args <- list(x = x,
                     weights = weights)
 
 
-orsf <- newtraph_cph(x[, ],
+orsf <- newtraph_cph(x[, , drop = FALSE],
                      y,
                      weights,
                      method = 0,
@@ -62,7 +66,7 @@ print(max(abs(orsf[, 2] - sqrt(diag(surv$var)))))
 
 bmark <- microbenchmark(
 
-    orsf = newtraph_cph(x = x[, ],
+    orsf = newtraph_cph(x = x[, , drop = FALSE],
                         y = y[, ],
                         weights,
                         method = 0,
@@ -72,9 +76,9 @@ bmark <- microbenchmark(
 
     surv = suppressWarnings(do.call(coxph.fit, coxph_args)),
 
-    glmnet = do.call(glmnet, glmnet_args),
-
-    glmnet_cv = do.call(cv.glmnet, glmnet_args),
+    # glmnet = do.call(glmnet, glmnet_args),
+    #
+    # glmnet_cv = do.call(cv.glmnet, glmnet_args),
 
     unit = 'relative',
 

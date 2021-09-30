@@ -82,7 +82,7 @@ bmark <- microbenchmark(
 
     unit = 'relative',
 
-    times = 1000
+    times = 100
 
 )
 

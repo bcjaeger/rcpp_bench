@@ -434,7 +434,7 @@ double log_rank_test_v3(arma::mat& y_node,
                         arma::vec& group){
 
   double temp1, temp2, deaths;
-  double nrisk=0, observed=0, expected=0, V=0, risk=0;
+  double n_risk=0, observed=0, expected=0, V=0, g_risk=0;
   bool break_loop = false;
 
   arma::uword j = y_node.n_rows-1;
@@ -447,10 +447,9 @@ double log_rank_test_v3(arma::mat& y_node,
 
     for (; y_node.at(j, 0) == temp1; j--) {
 
-      nrisk++;
-
+      n_risk++;
       deaths += y_node.at(j, 1);
-      risk += group[j];
+      g_risk += group[j];
       observed += y_node.at(j, 1) * group[j];
 
       if(j == 0){
@@ -464,22 +463,74 @@ double log_rank_test_v3(arma::mat& y_node,
     // but turns out its faster to multiply by 0 than
     // it is to check whether deaths is > 0
 
-    temp2 = risk / nrisk;
+    temp2 = g_risk / n_risk;
     expected += deaths * temp2;
 
-    // update variance if nrisk > 1 (if nrisk == 1, variance is 0)
-    // definitely check if nrisk is > 1 b/c otherwise divide by 0
-    if (nrisk>1){
-
-      temp1 = deaths * temp2 * (nrisk-deaths) / (nrisk-1);
+    // update variance if n_risk > 1 (if n_risk == 1, variance is 0)
+    // definitely check if n_risk is > 1 b/c otherwise divide by 0
+    if (n_risk>1){
+      temp1 = deaths * temp2 * (n_risk-deaths) / (n_risk-1);
       V += temp1 * (1 - temp2);
-
     }
 
   }
 
 
   return(pow(expected-observed, 2) / V);
+
+
+}
+
+// [[Rcpp::export]]
+arma::mat log_rank_test_v4(arma::mat& y_node,
+                           arma::vec& group){
+
+  double temp1, deaths;
+  double n_risk=0, g_risk=0;
+  bool break_loop = false;
+
+  arma::uword j = y_node.n_rows-1;
+  arma::mat out(j, 4);
+  arma::uword i = 0;
+
+
+  while (!break_loop){
+
+    temp1 = y_node.at(j, 0);
+
+    deaths = 0;
+
+    for (; y_node.at(j, 0) == temp1; j--) {
+
+      n_risk++;
+      deaths   += y_node.at(j, 1);
+      g_risk   += group[j];
+
+      if(j == 0){
+        break_loop = true;
+        break;
+      }
+
+    }
+
+    // should only do these calculations if deaths > 0,
+    // but turns out its faster to multiply by 0 than
+    // it is to check whether deaths is > 0
+
+    out(i, 0) = j+1;
+    out(i, 1) = g_risk;
+    out(i, 2) = n_risk;
+    out(i, 3) = deaths;
+    i++;
+
+  }
+
+
+  out.resize(i, 4);
+
+  if(out.at(i-1,0)==1) out.at(i-1,0)=0;
+
+  return(out);
 
 
 }

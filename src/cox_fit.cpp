@@ -280,9 +280,8 @@ double newtraph_cph_iter(const arma::uword& method,
 
   break_loop = false;
 
-  XB(arma::span(0, person)) = x_node * beta;
-  Risk(arma::span(0, person)) = arma::exp(XB) % w_node;
-
+  XB = x_node * beta;
+  Risk = arma::exp(XB) % w_node;
 
   for( ; ; ){
 

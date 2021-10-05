@@ -23,12 +23,12 @@ double
   denom,
   n_events,
   n_at_risk,
-  person_time,
+  temp2,
   w_node_person,
   x_beta,
   risk,
   loglik,
-  temp;
+  temp1;
 
 // armadillo unsigned integers
 arma::uword
@@ -132,13 +132,13 @@ void cholesky(){
 
       for(j = (i+1); j < n_vars; j++){
 
-        temp = imat.at(j,i) / pivot;
-        imat.at(j,i) = temp;
-        imat.at(j,j) -= temp*temp*pivot;
+        temp1 = imat.at(j,i) / pivot;
+        imat.at(j,i) = temp1;
+        imat.at(j,j) -= temp1*temp1*pivot;
 
         for(k = (j+1); k < n_vars; k++){
 
-          imat.at(k, j) -= temp * imat.at(k, i);
+          imat.at(k, j) -= temp1 * imat.at(k, i);
 
         }
 
@@ -159,12 +159,12 @@ void cholesky_solve(){
 
   for (i = 0; i < n_vars; i++) {
 
-    temp = u[i];
+    temp1 = u[i];
 
     for (j = 0; j < i; j++){
 
-      temp -= u[j] * imat.at(i, j);
-      u[i] = temp;
+      temp1 -= u[j] * imat.at(i, j);
+      u[i] = temp1;
 
     }
 
@@ -179,13 +179,13 @@ void cholesky_solve(){
 
     } else {
 
-      temp = u[i-1] / imat.at(i-1, i-1);
+      temp1 = u[i-1] / imat.at(i-1, i-1);
 
       for (j = i; j < n_vars; j++){
-        temp -= u[j] * imat.at(j, i-1);
+        temp1 -= u[j] * imat.at(j, i-1);
       }
 
-      u[i-1] = temp;
+      u[i-1] = temp1;
 
     }
 
@@ -236,12 +236,12 @@ void cholesky_invert(){
 
       for (j=(i+1); j<n_vars; j++) {
 
-        temp = imat.at(j, i) * imat.at(j, j);
+        temp1 = imat.at(j, i) * imat.at(j, j);
 
-        if (j!=i) imat.at(i, j) = temp;
+        if (j!=i) imat.at(i, j) = temp1;
 
         for (k=i; k<j; k++){
-          imat.at(i, k) += temp*imat.at(j, k);
+          imat.at(i, k) += temp1*imat.at(j, k);
         }
 
       }
@@ -285,13 +285,13 @@ double newtraph_cph_iter(const arma::uword& method,
 
   for( ; ; ){
 
-    person_time = y_node.at(person, 0); // time of event for current person
+    temp2 = y_node.at(person, 0); // time of event for current person
     n_events  = 0 ; // number of deaths at this time point
     weight_events = 0 ; // sum of w_node for the deaths
     denom_events = 0 ; // sum of weighted risks for the deaths
 
     // walk through this set of tied times
-    while(y_node.at(person, 0) == person_time){
+    while(y_node.at(person, 0) == temp2){
 
       n_at_risk++;
 
@@ -316,12 +316,12 @@ double newtraph_cph_iter(const arma::uword& method,
 
         for (i=0; i<n_vars; i++) {
 
-          temp = risk * x_node.at(person, i);
+          temp1 = risk * x_node.at(person, i);
 
-          a[i] += temp;
+          a[i] += temp1;
 
           for (j = 0; j <= i; j++){
-            cmat.at(j, i) += temp * x_node.at(person, j);
+            cmat.at(j, i) += temp1 * x_node.at(person, j);
           }
 
         }
@@ -367,12 +367,12 @@ double newtraph_cph_iter(const arma::uword& method,
         for (i=0; i<n_vars; i++) {
 
           a[i]  += a2[i];
-          temp  = a[i] / denom;  // mean
-          u[i]  -=  weight_events * temp;
+          temp1  = a[i] / denom;  // mean
+          u[i]  -=  weight_events * temp1;
 
           for (j=0; j<=i; j++) {
             cmat.at(j, i) += cmat2.at(j, i);
-            imat.at(j, i) += weight_events * (cmat.at(j, i) - temp * a[j]) / denom;
+            imat.at(j, i) += weight_events * (cmat.at(j, i) - temp1 * a[j]) / denom;
           }
 
         }
@@ -395,12 +395,12 @@ double newtraph_cph_iter(const arma::uword& method,
           for (i=0; i<n_vars; i++) {
 
             a[i] += a2[i] / n_events;
-            temp = a[i]  / denom;
-            u[i] -= weight_avg * temp;
+            temp1 = a[i]  / denom;
+            u[i] -= weight_avg * temp1;
 
             for (j=0; j<=i; j++) {
               cmat.at(j, i) += cmat2.at(j, i) / n_events;
-              imat.at(j, i) += weight_avg * (cmat.at(j, i) - temp * a[j]) / denom;
+              imat.at(j, i) += weight_avg * (cmat.at(j, i) - temp1 * a[j]) / denom;
             }
 
           }
@@ -448,13 +448,13 @@ double newtraph_cph_init(const arma::uword& method){
 
   for( ; ; ){
 
-    person_time = y_node.at(person, 0); // time of event for current person
+    temp2 = y_node.at(person, 0); // time of event for current person
     n_events  = 0 ; // number of deaths at this time point
     weight_events = 0 ; // sum of w_node for the deaths
     denom_events = 0 ; // sum of weighted risks for the deaths
 
     // walk through this set of tied times
-    while(y_node.at(person, 0) == person_time){
+    while(y_node.at(person, 0) == temp2){
 
       n_at_risk++;
 
@@ -468,12 +468,12 @@ double newtraph_cph_init(const arma::uword& method){
 
         for (i=0; i<n_vars; i++) {
 
-          temp = risk * x_node.at(person, i);
+          temp1 = risk * x_node.at(person, i);
 
-          a[i] += temp;
+          a[i] += temp1;
 
           for (j = 0; j <= i; j++){
-            cmat.at(j, i) += temp * x_node.at(person, j);
+            cmat.at(j, i) += temp1 * x_node.at(person, j);
           }
 
         }
@@ -487,13 +487,13 @@ double newtraph_cph_init(const arma::uword& method){
 
         for (i=0; i<n_vars; i++) {
 
-          temp = risk * x_node.at(person, i);
+          temp1 = risk * x_node.at(person, i);
 
-          u[i]  += temp;
-          a2[i] += temp;
+          u[i]  += temp1;
+          a2[i] += temp1;
 
           for (j=0; j<=i; j++){
-            cmat2.at(j, i) += temp * x_node.at(person, j);
+            cmat2.at(j, i) += temp1 * x_node.at(person, j);
           }
 
         }
@@ -520,12 +520,12 @@ double newtraph_cph_init(const arma::uword& method){
         for (i=0; i<n_vars; i++) {
 
           a[i]  += a2[i];
-          temp  = a[i] / denom;  // mean
-          u[i]  -=  denom_events * temp;
+          temp1  = a[i] / denom;  // mean
+          u[i]  -=  denom_events * temp1;
 
           for (j=0; j<=i; j++) {
             cmat.at(j, i) += cmat2.at(j, i);
-            imat.at(j, i) += denom_events * (cmat.at(j, i) - temp * a[j]) / denom;
+            imat.at(j, i) += denom_events * (cmat.at(j, i) - temp1 * a[j]) / denom;
           }
 
         }
@@ -548,12 +548,12 @@ double newtraph_cph_init(const arma::uword& method){
           for (i = 0; i < n_vars; i++) {
 
             a[i] += a2[i] / n_events;
-            temp = a[i]  / denom;
-            u[i] -= weight_avg * temp;
+            temp1 = a[i]  / denom;
+            u[i] -= weight_avg * temp1;
 
             for (j=0; j<=i; j++) {
               cmat.at(j, i) += cmat2.at(j, i) / n_events;
-              imat.at(j, i) += weight_avg * (cmat.at(j, i) - temp * a[j]) / denom;
+              imat.at(j, i) += weight_avg * (cmat.at(j, i) - temp1 * a[j]) / denom;
             }
 
           }

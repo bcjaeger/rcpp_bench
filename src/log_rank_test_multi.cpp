@@ -13,7 +13,7 @@ double lrt_multi_v1(arma::mat& y_node,
 
   // about this function - - - - - - - - - - - - - - - - - - - - - - - - - - -
   //
-  // this function returns a cutpoint obtaining the local maximum
+  // this function returns a cutpoint obtaining a local maximum
   // of the log-rank test (lrt) statistic. The default value (+Inf)
   // is really for diagnostic purposes. Put another way, if the
   // return value is +Inf (an impossible value for a cutpoint),

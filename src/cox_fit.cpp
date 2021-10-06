@@ -640,6 +640,7 @@ arma::mat newtraph_cph(NumericMatrix& x,
       cholesky();
 
       // check for convergence
+      // break the loop if the new ll is ~ same as old best ll
       if(abs(1 - ll_best / ll_new) < eps){
         break;
       }

@@ -24,10 +24,16 @@ summary(mdl)
 
 XB <- predict(mdl)
 
-out = lrt_multi_v1(y, XB, 10, 2)
+group <- rep(0, length(XB))
+
+microbenchmark::microbenchmark(
+ v1 = lrt_multi_v1(y, XB, group, 13, 10, 2),
+ v2 = lrt_multi_v2(y, XB, 10, 2)
+)
+
 
 library(tidyverse)
-as_tibble(out) |>
+as_tibble(v1) |>
  set_names('x', 'y') |>
  ggplot(aes(x=x, y=y)) +
  geom_point()

@@ -27,11 +27,11 @@ double lrt_multi_v1(arma::mat& y_node,
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   double temp1, temp2, observed, expected, V, g_risk;
-  double deaths=0, n_risk=0, cp = R_PosInf;
+  double n_events=0, n_risk=0;
   bool break_loop;
 
   // initialize at the lowest possible LRT stat value
-  double lrt_current, lrt_max = 0;
+  double stat_current, stat_best = 0;
 
   // sort XB- we need to iterate over the sorted indices
   arma::uvec XB_sort = arma::sort_index(XB);
@@ -51,31 +51,32 @@ double lrt_multi_v1(arma::mat& y_node,
     // j is used in the outer loop.
     j,
     // k and p are used to determine the range of j.
-    k=0, p=0;
+    k=0, p=y_node.n_rows;
 
   // first determine the lowest value of XB that will
   // be a valid cut-point to split a node. A valid cut-point
   // is one that, if used, will result in at least min_obs
   // and min_events in both the left and right node.
   for(it = XB_sort.begin(); it != XB_sort.end(); ++it){
-    deaths += status[*it];
+    n_events += status[*it];
     n_risk++; // keep separate from k - n_risk will be weighted
     k++;
-    if(deaths >= min_events && n_risk >= min_obs) break;
+    if(n_events >= min_events && n_risk >= min_obs) break;
   }
 
   // got to reset these before finding the upper limit of j
-  deaths=0; n_risk=0;
+  n_events=0; n_risk=0;
 
   // group should be initialized as all 0s
   group.fill(0);
 
   for(it = XB_sort.end()-1; it >= XB_sort.begin(); --it){
-    deaths += status[*it];
+    n_events += status[*it];
     group[*it] = 1;
     n_risk++;
-    p++;
-    if(deaths >= min_events && n_risk >= min_obs) break;
+    // p: location in XB when we take p steps away from the end of XB.
+    p--;
+    if(n_events >= min_events && n_risk >= min_obs) break;
   }
 
   // this is just done to avoid compilation warnings
@@ -90,26 +91,18 @@ double lrt_multi_v1(arma::mat& y_node,
   // telling us where we are after taking p steps from the end
   // of the XB vec. Returning the infinite cp is a red flag.
 
-  // re-form p to be our location in XB when we take p steps
-  // away from the end of XB.
-  p = y_node.n_rows - p;
+  if ( k > p ) return(R_PosInf);
 
-  if ( k > p ) return(cp);
+  // adjust p to indicate steps taken in the outer loop.
+  p -= k;
 
-  // reset p to tell us how many total steps we need to take
-  // in the j-loop that we are about to start.
-  p = p - k;
+  // adjust k to tell us when we are at a landmark value of j.
+  k = round(p / (n_cps));
 
-  // reset k to tell us when we are at a landmark value of j
-  k = ceil(p / n_cps);
-
-  // Rcout << "upper index: " << y_node.n_rows - n_risk - 1 << std::endl;
-  // Rcout << "lower index: " << steps_lower << std::endl;
-  // Rcout << "total steps: " << total_steps << std::endl;
-  // Rcout << "sum(g==1) = " << arma::sum(group) << std::endl;
-
-  Rcout << "k: " << k << std::endl;
-  Rcout << "p: " << p << std::endl;
+  // Rcout << "upper index: " << p << std::endl;
+  // Rcout << "landmarks at each " << k << " steps" << std::endl;
+  // arma::uvec tmp = arma::linspace<arma::uvec>(0, p, n_cps);
+  // Rcout << tmp << std::endl;
 
   // begin outer loop - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   for(j = 0; j < p; j++){
@@ -135,12 +128,12 @@ double lrt_multi_v1(arma::mat& y_node,
 
         temp1 = time[i];
 
-        deaths = 0;
+        n_events = 0;
 
         for ( ; time[i] == temp1; i--) {
 
           n_risk++;
-          deaths += status[i];
+          n_events += status[i];
           g_risk += group[i];
           observed += status[i] * group[i];
 
@@ -151,31 +144,30 @@ double lrt_multi_v1(arma::mat& y_node,
 
         }
 
-        // should only do these calculations if deaths > 0,
+        // should only do these calculations if n_events > 0,
         // but turns out its faster to multiply by 0 than
-        // it is to check whether deaths is > 0
+        // it is to check whether n_events is > 0
 
         temp2 = g_risk / n_risk;
-        expected += deaths * temp2;
+        expected += n_events * temp2;
 
         // update variance if n_risk > 1 (if n_risk == 1, variance is 0)
         // definitely check if n_risk is > 1 b/c otherwise divide by 0
         if (n_risk>1){
-          temp1 = deaths * temp2 * (n_risk-deaths) / (n_risk-1);
+          temp1 = n_events * temp2 * (n_risk-n_events) / (n_risk-1);
           V += temp1 * (1 - temp2);
         }
 
       }
 
-      lrt_current = pow(expected-observed, 2) / V;
+      stat_current = pow(expected-observed, 2) / V;
 
-      Rcout << "lrt_current: " << lrt_current << std::endl;
+      // Rcout << "stat_current: " << stat_current << std::endl;
+      // Rcout << "J: " << j << std::endl;
 
-      if(lrt_current > lrt_max){
+      if(stat_current > stat_best){
         it_best = it;
-        lrt_max = lrt_current;
-        cp = XB[*it];
-        Rcout << "cp" << cp << std::endl;
+        stat_best = stat_current;
       }
 
     }
@@ -193,157 +185,394 @@ double lrt_multi_v1(arma::mat& y_node,
   // best lrt stat. While rewinding it, also reset the group
   // values so that group is as it was when we got the best
   // lrt stat.
-  while(it <= it_best){
+  while(it < it_best){
     group[*it] = 0;
     ++it;
   }
 
-  return(cp);
+  return(XB[*it_best]);
 
 }
 
 // [[Rcpp::export]]
-arma::mat lrt_multi_v2(arma::mat& y_node,
-                       arma::vec& XB,
-                       double min_obs,
-                       double min_events){
+double lrt_multi_v2(arma::mat& y_node,
+                     arma::vec& XB,
+                     arma::vec& group,
+                     arma::uword n_cps,
+                     double min_obs,
+                     double min_events){
 
-  double temp1, deaths, observed, expected, V;
-  double n_events=0, n_obs=0, n_risk=0, g_risk=0;
-  bool break_loop=false;
+  // about this function - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  //
+  // this function returns a cutpoint obtaining a local maximum
+  // of the log-rank test (lrt) statistic. The default value (+Inf)
+  // is really for diagnostic purposes. Put another way, if the
+  // return value is +Inf (an impossible value for a cutpoint),
+  // that means that we didn't find any valid cut-points and
+  // the node cannot be grown with the current XB.
+  //
+  // if there is a valid cut-point, then the main side effect
+  // of this function is to modify the group vector, which
+  // will be used to assign observations to the two new nodes.
+  //
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+  double temp1, temp2, observed, expected, V, g_risk;
+  double n_events=0, n_risk=0;
+  bool break_loop;
+
+  // initialize at the lowest possible LRT stat value
+  double stat_current, stat_best = 0;
+
+  // sort XB- we need to iterate over the sorted indices
   arma::uvec XB_sort = arma::sort_index(XB);
 
-  arma::uword i, j, i_lower;
+  // speaking of which, here is that iterator.
+  arma::uvec::iterator iit, jit, iit_best;
 
-  for(i=0 ; i < y_node.n_rows; i++){
-    n_events += y_node.at(XB_sort[i], 1);
-    n_obs++;
-    if(n_events >= min_events && n_obs >= min_obs) break;
+  // unsafe columns point to specific cols in y_node.
+  // this makes the code more readable and doesn't copy data
+  arma::vec status = y_node.unsafe_col(1);
+  arma::vec time = y_node.unsafe_col(0);
+
+  // unsigned integers used by loops
+  arma::uword
+    // i is used within the lrt (inner) loop.
+    i,
+    // j is used to keep track of group assignments
+    j=0,
+    // p is used to determine the range of j.
+    k=y_node.n_rows;
+
+  // first determine the lowest value of XB that will
+  // be a valid cut-point to split a node. A valid cut-point
+  // is one that, if used, will result in at least min_obs
+  // and min_events in both the left and right node.
+  for(iit = XB_sort.begin(); iit != XB_sort.end(); ++iit){
+    n_events += status[*iit];
+    n_risk++;
+    j++;
+    if(n_events >= min_events && n_risk >= min_obs) break;
   }
 
-  i_lower = i;
+  // got to reset these before finding the upper limit of j
+  n_events=0; n_risk=0;
 
-  // Rcout << "i_lower: " << i_lower << std::endl;
-
-  n_events=0; n_obs=0;
-  arma::vec group(y_node.n_rows);
+  // group should be initialized as all 0s
   group.fill(0);
 
-  for(i = y_node.n_rows - 1; ; i--){
-    n_events += y_node.at(XB_sort[i], 1);
-    group[XB_sort[i]] = 1;
-    n_obs++;
-    if(n_events >= min_events && n_obs >= min_obs) break;
+  for(iit = XB_sort.end()-1; iit >= XB_sort.begin(); --iit){
+    n_events += status[*iit];
+    group[*iit] = 1;
+    n_risk++;
+    // k: location in XB when we take p steps away from the end of XB.
+    k--;
+    if(n_events >= min_events && n_risk >= min_obs) break;
   }
 
-  arma::uword g = i;
-  arma::uword total_steps = g - i_lower;
+  // this is just done to avoid compilation warnings
+  // (iit_best should be initialized before iit is used)
+  iit_best = iit;
 
-  i = y_node.n_rows-1;
-  j = 0;
+  // what happens if we don't have enough events or obs to split?
+  // the first valid lower cut-point (at XB_sort[k]) is > the first
+  // valid upper cutpoint (current value of n_risk). Put another way,
+  // k (the number of steps taken from beginning of the XB vec)
+  // will be > n_rows - p, where the difference on the RHS is
+  // telling us where we are after taking p steps from the end
+  // of the XB vec. Returning the infinite cp is a red flag.
 
-  arma::mat out(total_steps, 2);
-  arma::mat lrt(y_node.n_rows, 4);
+  if ( j > k ) return(R_PosInf);
 
-  while (!break_loop){
-
-    temp1 = y_node.at(i, 0);
-
-    deaths = 0;
-
-    for (; y_node.at(i, 0) == temp1; i--) {
-
-      n_risk++;
-      deaths   += y_node.at(i, 1);
-      g_risk   += group[i];
-
-      if(i == 0){
-        break_loop = true;
-        break;
-      }
-
-    }
-
-    lrt(j, 0) = i+1;
-    lrt(j, 1) = g_risk;
-    lrt(j, 2) = n_risk;
-    lrt(j, 3) = deaths;
-    j++;
-
-  }
-
-  lrt.resize(j,4);
-
-  //Rcout << "lrt first row: " << lrt.row(0) << std::endl;
-
-  arma::vec lrt_index  = lrt.unsafe_col(0);
-  arma::vec lrt_g_risk = lrt.unsafe_col(1);
-  arma::vec lrt_n_risk = lrt.unsafe_col(2);
-  arma::vec lrt_deaths = lrt.unsafe_col(3);
-  arma::vec status     = y_node.unsafe_col(1);
-
-  arma::vec v2 = lrt_g_risk / lrt_n_risk;
-  arma::vec v1 = lrt_deaths % v2 % (lrt_n_risk-lrt_deaths) / (lrt_n_risk-1);
-  arma::vec lrt_V = v1 % (1 - v2);
-
-  expected = arma::sum(lrt_deaths % v2);
-  observed = arma::sum(status % group);
-
-  if(isnan(lrt_V[0])) lrt_V[0] = 0;
-
-  V = arma::sum(lrt_V);
+  // adjust p to indicate steps taken in the outer loop.
+  k -= j;
 
   j = 0;
 
-  out(j,0) = XB[XB_sort(g)];
-  out(j,1) = pow(expected-observed, 2) / V;
+  // Rcout << "upper index: " << p << std::endl;
+  // Rcout << "landmarks at each " << k << " steps" << std::endl;
+  arma::uvec jvals = arma::linspace<arma::uvec>(0, k, n_cps);
+  // Rcout << tmp << std::endl;
 
-  j++;
-  g--;
+  // begin outer loop - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  for(jit = jvals.begin(); jit != jvals.end(); ++jit){
 
-  arma::uword k;
+    // drop down one spot on XB
+    // Rcout << "iit points to" << *iit << std::endl;
+    // Rcout << "jit points to" << *jit << std::endl;
 
-  while(g > i_lower){
+    for( ; j < *jit; j++){
+      group[*iit] = 1;
+      --iit;
+    }
 
-    for(k = lrt.n_rows - 1; ; k--) {
-      if (lrt_index[k] == XB_sort[g]) {
-        break;
-      } else if (lrt_index[k] > XB_sort[g]) {
-        k = k+1;
-        break;
+    n_risk=0;
+    g_risk=0;
+
+    observed=0;
+    expected=0;
+
+    V=0;
+
+    break_loop = false;
+
+    i = y_node.n_rows-1;
+
+    // begin inner loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - -
+    while (!break_loop){
+
+      temp1 = time[i];
+
+      n_events = 0;
+
+      for ( ; time[i] == temp1; i--) {
+
+        n_risk++;
+        n_events += status[i];
+        g_risk += group[i];
+        observed += status[i] * group[i];
+
+        if(i == 0){
+          break_loop = true;
+          break;
+        }
+
       }
+
+      // should only do these calculations if n_events > 0,
+      // but turns out its faster to multiply by 0 than
+      // it is to check whether n_events is > 0
+
+      temp2 = g_risk / n_risk;
+      expected += n_events * temp2;
+
+      // update variance if n_risk > 1 (if n_risk == 1, variance is 0)
+      // definitely check if n_risk is > 1 b/c otherwise divide by 0
+      if (n_risk>1){
+        temp1 = n_events * temp2 * (n_risk-n_events) / (n_risk-1);
+        V += temp1 * (1 - temp2);
+      }
+
+    }
+    // end inner loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - - -
+
+    stat_current = pow(expected-observed, 2) / V;
+
+    // Rcout << "stat_current: " << stat_current << std::endl;
+    // Rcout << "J: " << j << std::endl;
+
+    if(stat_current > stat_best){
+      iit_best = iit;
+      stat_best = stat_current;
     }
 
-    observed += status[XB_sort[g]];
 
-    for(; k < lrt.n_rows; k++){
-
-      expected += lrt_deaths[k] / lrt_n_risk[k];
-
-      v2[k] += 1 / lrt_n_risk[k];
-
-      v1[k] += lrt_deaths[k] * (lrt_n_risk[k]-lrt_deaths[k]) /
-        (lrt_n_risk[k] * (lrt_n_risk[k]-1));
-
-      lrt_V[k] = v1[k] * (1-v2[k]);
-
-    }
-
-    V = arma::sum(lrt_V);
-
-    out(j,0) = XB[XB_sort[g]];
-    out(j,1) = pow(expected-observed, 2) / V;
-
-    j++;
-    g--;
-
+    // end outer loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - - -
 
   }
 
+  // rewind iit until it is back where it was when we got the
+  // best lrt stat. While rewinding iit, also reset the group
+  // values so that group is as it was when we got the best
+  // lrt stat.
+  while(iit < iit_best){
+    group[*iit] = 0;
+    ++iit;
+  }
+
+  return(XB[*iit_best]);
+
+}
 
 
+// [[Rcpp::export]]
+double lrt_multi_v3b(arma::mat& y_node,
+                     arma::vec& XB,
+                     arma::vec& group,
+                     arma::uword n_cps,
+                     double min_obs,
+                     double min_events){
 
-  return(out);
+  // about this function - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  //
+  // this function returns a cutpoint obtaining a local maximum
+  // of the log-rank test (lrt) statistic. The default value (+Inf)
+  // is really for diagnostic purposes. Put another way, if the
+  // return value is +Inf (an impossible value for a cutpoint),
+  // that means that we didn't find any valid cut-points and
+  // the node cannot be grown with the current XB.
+  //
+  // if there is a valid cut-point, then the main side effect
+  // of this function is to modify the group vector, which
+  // will be used to assign observations to the two new nodes.
+  //
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  double temp1, temp2, observed, expected, V, g_risk;
+  double n_events=0, n_risk=0;
+  bool break_loop;
+
+  // initialize at the lowest possible LRT stat value
+  double stat_current, stat_best = 0;
+
+  // sort XB- we need to iterate over the sorted indices
+  arma::uvec XB_sort = arma::sort_index(XB);
+
+  // speaking of which, here is that iterator.
+  arma::uvec::iterator iit, jit, iit_best;
+
+  // unsafe columns point to specific cols in y_node.
+  // this makes the code more readable and doesn't copy data
+  arma::vec status = y_node.unsafe_col(1);
+  arma::vec time = y_node.unsafe_col(0);
+
+  // unsigned integers used by loops
+  arma::uword
+    // i is used within the lrt (inner) loop.
+    i,
+    // j is used to keep track of group assignments
+    j=0,
+    // p is used to determine the range of j.
+    k=y_node.n_rows;
+
+  // first determine the lowest value of XB that will
+  // be a valid cut-point to split a node. A valid cut-point
+  // is one that, if used, will result in at least min_obs
+  // and min_events in both the left and right node.
+  for(iit = XB_sort.begin(); iit != XB_sort.end(); ++iit){
+    n_events += status[*iit];
+    n_risk++;
+    j++;
+    if(n_events >= min_events && n_risk >= min_obs) break;
+  }
+
+  // got to reset these before finding the upper limit of j
+  n_events=0; n_risk=0;
+
+  // group should be initialized as all 0s
+  group.fill(0);
+
+  for(iit = XB_sort.end()-1; iit >= XB_sort.begin(); --iit){
+    n_events += status[*iit];
+    group[*iit] = 1;
+    n_risk++;
+    // k: location in XB when we take p steps away from the end of XB.
+    k--;
+    if(n_events >= min_events && n_risk >= min_obs) break;
+  }
+
+  // this is just done to avoid compilation warnings
+  // (iit_best should be initialized before iit is used)
+  iit_best = iit;
+
+  // what happens if we don't have enough events or obs to split?
+  // the first valid lower cut-point (at XB_sort[k]) is > the first
+  // valid upper cutpoint (current value of n_risk). Put another way,
+  // k (the number of steps taken from beginning of the XB vec)
+  // will be > n_rows - p, where the difference on the RHS is
+  // telling us where we are after taking p steps from the end
+  // of the XB vec. Returning the infinite cp is a red flag.
+
+  if ( j > k ) return(R_PosInf);
+
+  // adjust p to indicate steps taken in the outer loop.
+  k -= j;
+
+  j = 0;
+
+  // Rcout << "upper index: " << p << std::endl;
+  // Rcout << "landmarks at each " << k << " steps" << std::endl;
+  arma::uvec jvals = arma::linspace<arma::uvec>(0, k, n_cps);
+  // Rcout << tmp << std::endl;
+
+  // begin outer loop - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  for(jit = jvals.begin(); jit != jvals.end(); ++jit){
+
+    // drop down one spot on XB
+    // Rcout << "iit points to" << *iit << std::endl;
+    // Rcout << "jit points to" << *jit << std::endl;
+
+    for( ; j < *jit; j++){
+      group[*iit] = 1;
+      --iit;
+    }
+
+    n_risk=0;
+    g_risk=0;
+
+    observed=0;
+    expected=0;
+
+    V=0;
+
+    break_loop = false;
+
+    i = y_node.n_rows-1;
+
+    // begin inner loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - -
+    for (; ;){
+
+      temp1 = time[i];
+
+      n_events = 0;
+
+      for ( ; time[i] == temp1; i--) {
+
+        n_risk++;
+        n_events += status[i];
+        g_risk += group[i];
+        observed += status[i] * group[i];
+
+        if(i == 0){
+          break_loop = true;
+          break;
+        }
+
+      }
+
+      // should only do these calculations if n_events > 0,
+      // but turns out its faster to multiply by 0 than
+      // it is to check whether n_events is > 0
+
+      temp2 = g_risk / n_risk;
+      expected += n_events * temp2;
+
+      // update variance if n_risk > 1 (if n_risk == 1, variance is 0)
+      // definitely check if n_risk is > 1 b/c otherwise divide by 0
+      if (n_risk>1){
+        temp1 = n_events * temp2 * (n_risk-n_events) / (n_risk-1);
+        V += temp1 * (1 - temp2);
+      }
+
+      if(break_loop) break;
+
+    }
+    // end inner loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - - -
+
+    stat_current = pow(expected-observed, 2) / V;
+
+    // Rcout << "stat_current: " << stat_current << std::endl;
+    // Rcout << "J: " << j << std::endl;
+
+    if(stat_current > stat_best){
+      iit_best = iit;
+      stat_best = stat_current;
+    }
+
+
+    // end outer loop  - - - - - - - - - - - - -  - - - - - - - - - - - - - - -
+
+  }
+
+  // rewind iit until it is back where it was when we got the
+  // best lrt stat. While rewinding iit, also reset the group
+  // values so that group is as it was when we got the best
+  // lrt stat.
+  while(iit < iit_best){
+    group[*iit] = 0;
+    ++iit;
+  }
+
+  return(XB[*iit_best]);
 
 }

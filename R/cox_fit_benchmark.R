@@ -80,7 +80,7 @@ bmark <- microbenchmark(
 
     # glmnet_cv = do.call(cv.glmnet, glmnet_args),
 
-    # unit = 'relative',
+    unit = 'relative',
 
     times = 1000
 

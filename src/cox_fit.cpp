@@ -22,13 +22,15 @@ double
   denom_events,
   denom,
   n_events,
-  n_at_risk,
+  n_risk,
+  temp1,
   temp2,
   w_node_person,
   x_beta,
   risk,
-  loglik,
-  temp1;
+  loglik;
+
+
 
 // armadillo unsigned integers
 arma::uword
@@ -264,7 +266,7 @@ double newtraph_cph_iter(const arma::uword& method,
 
   loglik = 0;
 
-  n_at_risk = 0;
+  n_risk = 0;
 
   person = x_node.n_rows - 1;
 
@@ -293,7 +295,7 @@ double newtraph_cph_iter(const arma::uword& method,
     // walk through this set of tied times
     while(y_node.at(person, 0) == temp2){
 
-      n_at_risk++;
+      n_risk++;
 
       x_beta = XB.at(person);
       risk = Risk.at(person);
@@ -428,7 +430,7 @@ double newtraph_cph_init(const arma::uword& method){
 
   denom = 0;
   loglik = 0;
-  n_at_risk = 0;
+  n_risk = 0;
 
   person = x_node.n_rows - 1;
 
@@ -456,7 +458,7 @@ double newtraph_cph_init(const arma::uword& method){
     // walk through this set of tied times
     while(y_node.at(person, 0) == temp2){
 
-      n_at_risk++;
+      n_risk++;
 
       risk = w_node.at(person);
 
@@ -597,7 +599,7 @@ arma::mat newtraph_cph(NumericMatrix& x,
 
   arma::mat x_transforms = x_scale_wtd();
 
-  double ll_new, ll_best, halving = 0;
+  double stat_current, stat_best, halving = 0;
 
   // set_size is fast but unsafe, initial values are random
   beta_current.set_size(n_vars);
@@ -619,33 +621,33 @@ arma::mat newtraph_cph(NumericMatrix& x,
   cmat2.set_size(n_vars, n_vars);
 
   // do the initial iteration
-  ll_best = newtraph_cph_init(method);
+  stat_best = newtraph_cph_init(method);
 
-  //Rcpp::Rcout << "ll_best: " << ll_best << std::endl;
+  //Rcpp::Rcout << "stat_best: " << stat_best << std::endl;
 
   // update beta_current
   cholesky();
   cholesky_solve();
   beta_new = beta_current + u;
 
-  if(iter_max > 1 && ll_best < R_PosInf){
+  if(iter_max > 1 && stat_best < R_PosInf){
 
     for(iter = 1; iter < iter_max; iter++){
 
       // do the next iteration
-      ll_new = newtraph_cph_iter(method, beta_new);
+      stat_current = newtraph_cph_iter(method, beta_new);
 
-      //Rcpp::Rcout << "ll_new: " << ll_new << std::endl;
+      //Rcpp::Rcout << "stat_current: " << stat_current << std::endl;
 
       cholesky();
 
       // check for convergence
       // break the loop if the new ll is ~ same as old best ll
-      if(abs(1 - ll_best / ll_new) < eps){
+      if(abs(1 - stat_best / stat_current) < eps){
         break;
       }
 
-      if(ll_new < ll_best){ // it's not converging!
+      if(stat_current < stat_best){ // it's not converging!
 
         halving++; // get more aggressive when it doesn't work
 
@@ -658,7 +660,7 @@ arma::mat newtraph_cph(NumericMatrix& x,
       } else { // it's converging!
 
         halving = 0;
-        ll_best = ll_new;
+        stat_best = stat_current;
 
         cholesky_solve();
 

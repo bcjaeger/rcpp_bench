@@ -12,10 +12,10 @@ Rcpp::sourceCpp("src/log_rank_test.cpp")
 x <- as.matrix(.pbc[, -c(1,2,3,6), drop = FALSE])
 y <- Surv(.pbc$time, .pbc$status)
 
-# x <- orsf2::flchain_x
-# x <- x[, - which(colnames(x)=='sexM')]
-# y <- orsf2::flchain_y
-# y[1:3, 1] <- y[1:3, 1]+1e-4
+x <- orsf2::flchain_x
+x <- x[, - which(colnames(x)=='sexM')]
+y <- orsf2::flchain_y
+y[1:3, 1] <- y[1:3, 1]+1e-4
 
 # vet <- survival::veteran
 #
@@ -67,13 +67,15 @@ yy <- as.matrix(y)
 gg <- group-1
 
 bm <- microbenchmark(
-        tt = tt(n = nrow(y), rho = rho),
+        # tt = tt(n = nrow(y), rho = rho),
         # srv = survdiff(Surv(time, status) ~ group, rho = rho)$chisq,
-        v0 = log_rank_test_v0(yy, gg),
-        v1 = log_rank_test_v1(yy, group, rho = rho),
-        v2 = log_rank_test_v2(yy, group, rho = rho),
+        # v0 = log_rank_test_v0(yy, gg),
+        # v1 = log_rank_test_v1(yy, group, rho = rho),
+        # v2 = log_rank_test_v2(yy, group, rho = rho),
         v3 = log_rank_test_v3(yy, gg),
-        times = 1000
+        b3 = log_rank_test_v3b(yy, gg),
+        v4 = log_rank_test_v4(yy, gg),
+        times = 50000
 )
 
 print(bm)

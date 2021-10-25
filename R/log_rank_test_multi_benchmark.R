@@ -26,14 +26,15 @@ XB <- predict(mdl)
 
 group <- rep(0, length(XB))
 
-microbenchmark::microbenchmark(
- v1 = lrt_multi_v1(y, XB, group, 13, 10, 2),
- v2 = lrt_multi_v2(y, XB, 10, 2)
+bm = microbenchmark::microbenchmark(
+        v1 = lrt_multi_v1(y, XB, group, n_cps = 30, 10, 2),
+        v2 = lrt_multi_v2(y, XB, group, n_cps = 30, 10, 2),
+        v3b = lrt_multi_v3b(y, XB, group, n_cps = 30, 10, 2),
+        times = 1000
 )
 
+print(bm)
 
-library(tidyverse)
-as_tibble(v1) |>
- set_names('x', 'y') |>
- ggplot(aes(x=x, y=y)) +
- geom_point()
+# # test to make sure cp is what it should be
+# table(XB >= cp)
+# table(group)
